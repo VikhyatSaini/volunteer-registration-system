@@ -26,6 +26,10 @@ const userSchema = new mongoose.Schema(
       enum: ['pending', 'approved', 'rejected'],
       default: 'pending',
     },
+    profilePicture: {
+      type: String,
+      default: 'https://via.placeholder.com/150.png?text=User', // Default avatar
+    },
     availability: {
       type: [String], // An array of strings, e.g., ["Monday AM", "Wednesday PM"]
       default: [],

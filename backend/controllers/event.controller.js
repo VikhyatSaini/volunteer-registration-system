@@ -9,6 +9,10 @@ const createEvent = async (req, res) => {
   const { title, description, date, location, slotsAvailable } = req.body;
 
   try {
+    let bannerImage;
+    if (req.file) {
+      bannerImage = req.file.path; // Cloudinary puts the URL in 'path'
+    }
     const event = new Event({
       title,
       description,
@@ -16,6 +20,7 @@ const createEvent = async (req, res) => {
       location,
       slotsAvailable,
       createdBy: req.user._id, // req.user comes from our 'protect' middleware
+      bannerImage,
     });
 
     const createdEvent = await event.save();
@@ -25,13 +30,35 @@ const createEvent = async (req, res) => {
   }
 };
 
-// @desc    Get all events
-// @route   GET /api/events
-// @access  Public
+// @desc    Get all events with filtering and pagination
+// @route   GET /api/events?location=NewYork&date=2025-11-01
 const getAllEvents = async (req, res) => {
   try {
-    // Find events where the date is in the future
-    const events = await Event.find({ date: { $gte: new Date() } }).sort({ date: 1 }); // Sort by date ascending
+    // 1. Build the Query Object
+    const queryObj = { ...req.query };
+    const excludedFields = ['page', 'sort', 'limit', 'fields'];
+    excludedFields.forEach((el) => delete queryObj[el]);
+
+    // 2. Advanced Filtering (e.g. Greater than dates)
+    // Allows searching for events AFTER a certain date
+    let queryStr = JSON.stringify(queryObj);
+     console.log('1. Raw Query:', queryStr);
+    queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
+    
+    // 3. Finding the Resources
+    let query = Event.find({ slotsAvailable: { $gte: 20 } });
+
+    // 4. Sorting
+    if (req.query.sort) {
+      const sortBy = req.query.sort.split(',').join(' ');
+      query = query.sort(sortBy);
+    } else {
+      query = query.sort('date'); // Default sort by date (soonest first)
+    }
+
+    // 5. Execute Query
+    const events = await query;
+
     res.json(events);
   } catch (error) {
     res.status(500).json({ message: error.message });

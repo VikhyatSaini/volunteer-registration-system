@@ -29,7 +29,7 @@ const registerUser = async (req, res) => {
         name: user.name,
         email: user.email,
         role: user.role,
-        token: generateToken(user._id),
+        token: generateToken(user._id, user.role),
     });
     // Send welcome email (fire and forget)
     try {
@@ -73,6 +73,10 @@ const updateUserProfile = async (req, res) => {
     user.email = req.body.email || user.email;
     user.availability = req.body.availability || user.availability;
     user.skills = req.body.skills || user.skills;
+
+    if (req.file) {
+      user.profilePicture = req.file.path; // Save Cloudinary URL
+    }
     
     // You can add password change logic here if you want
     // if (req.body.password) {
@@ -86,9 +90,11 @@ const updateUserProfile = async (req, res) => {
       name: updatedUser.name,
       email: updatedUser.email,
       role: updatedUser.role,
+      status: updatedUser.status,
       availability: updatedUser.availability,
       skills: updatedUser.skills,
-      token: generateToken(updatedUser._id), // Re-issue token in case email/name changed
+      profilePicture: updatedUser.profilePicture,
+      token: generateToken(updatedUser._id, updateUser.role), // Re-issue token in case email/name changed
     });
   } else {
     res.status(404).json({ message: 'User not found' });

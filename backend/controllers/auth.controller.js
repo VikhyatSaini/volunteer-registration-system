@@ -24,7 +24,7 @@ const loginUser = async (req, res) => {
             name: user.name,
             email: user.email,
             role: user.role,
-            token: generateToken(user._id),
+            token: generateToken(user._id, user.role),
         });
     } else {
       res.status(401).json({ message: 'Invalid email or password' });
@@ -115,7 +115,7 @@ const resetPassword = async (req, res) => {
       name: user.name,
       email: user.email,
       role: user.role,
-      token: generateToken(user._id),
+      token: generateToken(user._id, user.role),
     });
 
   } catch (error) {
