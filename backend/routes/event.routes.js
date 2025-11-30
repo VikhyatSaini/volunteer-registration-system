@@ -14,7 +14,7 @@ const { submitHours } = require('../controllers/hourlog.controller');
 const { protect } = require('../middleware/auth.middleware');
 const { isAdmin } = require('../middleware/admin.middleware');
 const upload = require('../config/cloudinary');
-
+const { joinWaitlist } = require('../controllers/waitlist.controller');
 // --- Public Routes ---
 router.get('/', getAllEvents); // GET /api/events
 router.get('/:id', getEventById); // GET /api/events/123
@@ -29,7 +29,7 @@ router.get('/:id/volunteers', protect, isAdmin, getVolunteersForEvent);
 
 router.post('/:id/register', protect, registerForEvent); // POST /api/events/123/register
 router.delete('/:id/unregister', protect, unregisterForEvent); // DELETE /api/events/123/unregister
-
+router.post('/:id/waitlist', protect, joinWaitlist); 
 router.post('/:id/loghours', protect, submitHours);
 
 module.exports = router;
