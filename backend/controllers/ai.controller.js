@@ -98,36 +98,39 @@ const generateTags = async (req, res) => {
 // @access  Private (Volunteers)
 const recommendEvents = async (req, res) => {
   try {
-    const user = req.user; // Got from 'protect' middleware
-
-    if (!user.skills || user.skills.length === 0) {
-      return res.status(400).json({ message: 'Please add skills to your profile first.' });
-    }
-
-    // 1. Fetch upcoming events (Limit to 20 to save AI tokens)
+    const user = req.user;
+    
+    // 1. Fetch upcoming events
     const events = await Event.find({ date: { $gte: new Date() } })
-      .select('_id title description date location tags') // Only send necessary text
+      .select('_id title description date location tags')
       .limit(20);
 
-    if (events.length === 0) {
-      return res.json({ recommendations: [] });
-    }
+    // 2. Decide the Prompt based on skills
+    let prompt;
 
-    // 2. Build the Prompt
-    const prompt = `
-      Act as a volunteer coordinator. Match the user to the best events.
-      
-      User Skills: ${JSON.stringify(user.skills)}
-      
-      Available Events:
-      ${JSON.stringify(events)}
-      
-      Task:
-      1. Analyze the events and find the top 3 matches for this user.
-      2. Return ONLY a JSON array of objects.
-      3. Format: { "eventId": "...", "matchScore": "High/Medium", "reason": "1 short sentence explaining why" }
-      4. If no events match well, pick the most generic ones (e.g. community service).
-    `;
+    // SCENARIO A: User HAS skills
+    if (user.skills && user.skills.length > 0) {
+       prompt = `
+        Act as a volunteer coordinator.
+        User Skills: ${JSON.stringify(user.skills)}
+        Available Events: ${JSON.stringify(events)}
+        
+        Task: Find the top 3 matches based on these skills.
+        Return JSON array: [{ "eventId": "...", "matchScore": "High", "reason": "..." }]
+      `;
+    } 
+    
+    // SCENARIO B: User has NO skills (The Fix)
+    else {
+       prompt = `
+        Act as a volunteer coordinator.
+        User Skills: NONE (Beginner).
+        Available Events: ${JSON.stringify(events)}
+        
+        Task: Find the top 3 events that are "Beginner Friendly", "General Help", or require "No Experience".
+        Return JSON array: [{ "eventId": "...", "matchScore": "High", "reason": "This event is great for beginners..." }]
+      `;
+    }
 
     // 3. Call Gemini
     const result = await model.generateContent(prompt);
