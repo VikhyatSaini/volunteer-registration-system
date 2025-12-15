@@ -38,3 +38,11 @@
         └── error.middleware.js  <-- (Advanced) A central place to catch all errors.
 
 use socket.io for faster notification 
+to do:
+implement email logic,  and google login
+jest supertest for testing the apis
+pagination and waiting list
+when user register no of slots dec in frontend but for another user he sees total slots again. is it slot number not updating in the backend
+profile pucture doesnt show on frotend after adding it. is it frontend issue
+contact us
+make pending as punidhment or temp ban of a week
