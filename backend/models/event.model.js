@@ -22,6 +22,10 @@ const eventSchema = new mongoose.Schema(
       type: String, // This will hold the URL from Cloudinary
       default: 'https://via.placeholder.com/800x400.png?text=Event+Banner', // A default placeholder
     },
+    tags: {
+      type: [String], // An array of strings
+      default: [],
+    },
     slotsAvailable: {
       type: Number,
       required: true,

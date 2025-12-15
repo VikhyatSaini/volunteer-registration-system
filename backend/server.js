@@ -8,6 +8,7 @@ const userRoutes = require('./routes/user.routes');
 const authRoutes = require('./routes/auth.routes');
 const eventRoutes = require('./routes/event.routes'); 
 const adminRoutes = require('./routes/admin.routes');
+const aiRoutes = require('./routes/ai.routes');
 
 // Load environment variables
 dotenv.config();
@@ -35,7 +36,11 @@ app.use('/api/auth', authRoutes);   // e.g., /api/auth/login
 app.use('/api/events', eventRoutes); 
 app.use('/api/admin', adminRoutes);
 
+app.use('/api/ai', aiRoutes);
+
 // (We will add error middleware here later for a cleaner setup)
+
+// const app = require('./app');   //jest
 
 // --- Start the Server ---
 const PORT = process.env.PORT || 5000;

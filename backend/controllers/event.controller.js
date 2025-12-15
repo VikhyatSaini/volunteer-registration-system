@@ -1,12 +1,14 @@
 const Event = require('../models/event.model');
 const Registration = require('../models/registration.model');
+const Waitlist = require('../models/waitlist.model');
+const { sendEmail } = require('../utils/mail');
 const mongoose = require('mongoose');
 
 // @desc    Create a new event
 // @route   POST /api/events
 // @access  Private (will be Admin in Phase 3, but Private for now)
 const createEvent = async (req, res) => {
-  const { title, description, date, location, slotsAvailable } = req.body;
+  const { title, description, date, location, slotsAvailable, tags} = req.body;
 
   try {
     let bannerImage;
@@ -19,6 +21,7 @@ const createEvent = async (req, res) => {
       date,
       location,
       slotsAvailable,
+      tags,
       createdBy: req.user._id, // req.user comes from our 'protect' middleware
       bannerImage,
     });
@@ -30,33 +33,35 @@ const createEvent = async (req, res) => {
   }
 };
 
-// @desc    Get all events with filtering and pagination
-// @route   GET /api/events?location=NewYork&date=2025-11-01
+// @desc    Get all events with pagination & basic filtering
+// @route   GET /api/events
 const getAllEvents = async (req, res) => {
   try {
-    // 1. Build the Query Object
+    // --- 1. FILTERING SETUP ---
     const queryObj = { ...req.query };
     const excludedFields = ['page', 'sort', 'limit', 'fields'];
     excludedFields.forEach((el) => delete queryObj[el]);
 
-    // 2. Advanced Filtering (e.g. Greater than dates)
-    // Allows searching for events AFTER a certain date
+    // Add $ operator for advanced filtering (gte, lte, etc.)
     let queryStr = JSON.stringify(queryObj);
-     console.log('1. Raw Query:', queryStr);
     queryStr = queryStr.replace(/\b(gte|gt|lte|lt)\b/g, (match) => `$${match}`);
     
-    // 3. Finding the Resources
-    let query = Event.find({ slotsAvailable: { $gte: 20 } });
+    const parsedQuery = JSON.parse(queryStr);
 
-    // 4. Sorting
-    if (req.query.sort) {
-      const sortBy = req.query.sort.split(',').join(' ');
-      query = query.sort(sortBy);
-    } else {
-      query = query.sort('date'); // Default sort by date (soonest first)
-    }
+    // --- 2. PAGINATION SETUP ---
+    const page = parseInt(req.query.page, 10) || 1;
+    const limit = parseInt(req.query.limit, 10) || 6;
+    const skip = (page - 1) * limit;
 
-    // 5. Execute Query
+    // --- 3. BUILD QUERY ---
+    // We use 'parsedQuery' so basic filters still work (like location).
+    // If no params are sent, parsedQuery is {}, so it finds ALL events.
+    let query = Event.find(parsedQuery)
+                     .sort({ date: 1 }) // Default: Soonest events first
+                     .skip(skip)
+                     .limit(limit);
+
+    // --- 4. EXECUTE ---
     const events = await query;
 
     res.json(events);
@@ -64,6 +69,7 @@ const getAllEvents = async (req, res) => {
     res.status(500).json({ message: error.message });
   }
 };
+
 
 // @desc    Get a single event by ID
 // @route   GET /api/events/:id
@@ -133,7 +139,7 @@ const registerForEvent = async (req, res) => {
   }
 };
 
-// @desc    Unregister the logged-in user from an event
+// @desc    Unregister from event (with Waitlist Promotion)
 // @route   DELETE /api/events/:id/unregister
 // @access  Private
 const unregisterForEvent = async (req, res) => {
@@ -141,6 +147,7 @@ const unregisterForEvent = async (req, res) => {
   const volunteerId = req.user._id;
 
   try {
+    // 1. Remove the user's registration
     const registration = await Registration.findOneAndDelete({
       event: eventId,
       volunteer: volunteerId,
@@ -150,8 +157,45 @@ const unregisterForEvent = async (req, res) => {
       return res.status(404).json({ message: 'Registration not found' });
     }
 
+    // --- AUTO-PROMOTION LOGIC START ---
+    
+    // 2. Find the next person in line (Oldest waitlist entry first)
+    const nextInLine = await Waitlist.findOne({ event: eventId })
+                                     .sort({ createdAt: 1 })
+                                     .populate('volunteer');
+
+    if (nextInLine) {
+      console.log(`Promoting user ${nextInLine.volunteer.name} from waitlist...`);
+
+      // 3. Create a new registration for them
+      await Registration.create({
+        event: eventId,
+        volunteer: nextInLine.volunteer._id,
+      });
+
+      // 4. Remove them from the waitlist
+      await Waitlist.findByIdAndDelete(nextInLine._id);
+
+      // 5. Send Notification Email (Fire and forget - don't await blocking)
+      const eventDetails = await Event.findById(eventId);
+      
+      try {
+        const emailOptions = {
+          to: nextInLine.volunteer.email,
+          subject: `Good News! You're in: ${eventDetails.title}`,
+          text: `Hi ${nextInLine.volunteer.name},\n\nA spot opened up for "${eventDetails.title}" and you have been automatically registered!\n\nDate: ${new Date(eventDetails.date).toLocaleDateString()}\nLocation: ${eventDetails.location}\n\nSee you there!`
+        };
+        sendEmail(emailOptions); // Using your existing mail utility
+      } catch (emailError) {
+        console.error('Promotion email failed to send:', emailError);
+      }
+    }
+    // --- AUTO-PROMOTION LOGIC END ---
+
     res.json({ message: 'Successfully unregistered from event' });
+
   } catch (error) {
+    console.error(error);
     res.status(500).json({ message: error.message });
   }
 };

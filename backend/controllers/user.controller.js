@@ -94,7 +94,7 @@ const updateUserProfile = async (req, res) => {
       availability: updatedUser.availability,
       skills: updatedUser.skills,
       profilePicture: updatedUser.profilePicture,
-      token: generateToken(updatedUser._id, updateUser.role), // Re-issue token in case email/name changed
+      token: generateToken(updatedUser._id, updatedUser.role), // Re-issue token in case email/name changed
     });
   } else {
     res.status(404).json({ message: 'User not found' });
