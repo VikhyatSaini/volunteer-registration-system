@@ -6,9 +6,9 @@ const mongoose = require('mongoose');
 
 // @desc    Create a new event
 // @route   POST /api/events
-// @access  Private (will be Admin in Phase 3, but Private for now)
+// @access  Private (Admin)
 const createEvent = async (req, res) => {
-  const { title, description, date, location, slotsAvailable, tags} = req.body;
+  const { title, description, date, location, slotsAvailable, tags } = req.body;
 
   try {
     let bannerImage;
@@ -33,7 +33,7 @@ const createEvent = async (req, res) => {
   }
 };
 
-// @desc    Get all events with pagination & basic filtering
+// @desc    Get all events with pagination, filtering & REGISTRATION COUNTS
 // @route   GET /api/events
 const getAllEvents = async (req, res) => {
   try {
@@ -53,23 +53,33 @@ const getAllEvents = async (req, res) => {
     const limit = parseInt(req.query.limit, 10) || 6;
     const skip = (page - 1) * limit;
 
-    // --- 3. BUILD QUERY ---
-    // We use 'parsedQuery' so basic filters still work (like location).
-    // If no params are sent, parsedQuery is {}, so it finds ALL events.
+    // --- 3. EXECUTE QUERY ---
     let query = Event.find(parsedQuery)
                      .sort({ date: 1 }) // Default: Soonest events first
                      .skip(skip)
                      .limit(limit);
 
-    // --- 4. EXECUTE ---
     const events = await query;
 
-    res.json(events);
+    // --- 4. ATTACH REGISTRATION COUNTS ---
+    // We iterate over the fetched events and count real registrations for each
+    const eventsWithCounts = await Promise.all(events.map(async (event) => {
+      // Count how many docs in 'Registration' collection match this event ID
+      const count = await Registration.countDocuments({ event: event._id });
+      
+      // Convert mongoose doc to plain object and add our new fields
+      return { 
+        ...event.toObject(), 
+        registrationCount: count,
+        remainingSlots: Math.max(0, event.slotsAvailable - count)
+      };
+    }));
+
+    res.json(eventsWithCounts);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
-
 
 // @desc    Get a single event by ID
 // @route   GET /api/events/:id
@@ -79,7 +89,15 @@ const getEventById = async (req, res) => {
     const event = await Event.findById(req.params.id);
 
     if (event) {
-      res.json(event);
+      // Add count for single event view
+      const count = await Registration.countDocuments({ event: event._id });
+      const eventData = {
+        ...event.toObject(),
+        registrationCount: count,
+        remainingSlots: Math.max(0, event.slotsAvailable - count)
+      };
+      
+      res.json(eventData);
     } else {
       res.status(404).json({ message: 'Event not found' });
     }
@@ -96,15 +114,16 @@ const registerForEvent = async (req, res) => {
   const volunteerId = req.user._id;
 
   try {
-    if (req.user.status !== 'approved') {
-      return res.status(403).json({ message: 'Your account must be approved to register for events.' });
-    }
+    // Optional: Check status if you require approval
+    // if (req.user.status !== 'approved') {
+    //   return res.status(403).json({ message: 'Your account must be approved to register for events.' });
+    // }
+
     const event = await Event.findById(eventId);
     if (!event) {
       return res.status(404).json({ message: 'Event not found' });
     }
 
-    // --- Core Logic ---
     // 1. Check if slots are available
     const existingRegistrations = await Registration.countDocuments({ event: eventId });
     if (existingRegistrations >= event.slotsAvailable) {
@@ -112,7 +131,6 @@ const registerForEvent = async (req, res) => {
     }
 
     // 2. Check if user is already registered (using the unique index)
-    // The Registration model already prevents duplicates, but we send a nice message
     const alreadyRegistered = await Registration.findOne({
       event: eventId,
       volunteer: volunteerId,
@@ -165,8 +183,6 @@ const unregisterForEvent = async (req, res) => {
                                      .populate('volunteer');
 
     if (nextInLine) {
-      console.log(`Promoting user ${nextInLine.volunteer.name} from waitlist...`);
-
       // 3. Create a new registration for them
       await Registration.create({
         event: eventId,
@@ -176,18 +192,20 @@ const unregisterForEvent = async (req, res) => {
       // 4. Remove them from the waitlist
       await Waitlist.findByIdAndDelete(nextInLine._id);
 
-      // 5. Send Notification Email (Fire and forget - don't await blocking)
+      // 5. Send Notification Email (Fire and forget)
       const eventDetails = await Event.findById(eventId);
       
-      try {
-        const emailOptions = {
-          to: nextInLine.volunteer.email,
-          subject: `Good News! You're in: ${eventDetails.title}`,
-          text: `Hi ${nextInLine.volunteer.name},\n\nA spot opened up for "${eventDetails.title}" and you have been automatically registered!\n\nDate: ${new Date(eventDetails.date).toLocaleDateString()}\nLocation: ${eventDetails.location}\n\nSee you there!`
-        };
-        sendEmail(emailOptions); // Using your existing mail utility
-      } catch (emailError) {
-        console.error('Promotion email failed to send:', emailError);
+      if (eventDetails && nextInLine.volunteer && nextInLine.volunteer.email) {
+        try {
+          const emailOptions = {
+            to: nextInLine.volunteer.email,
+            subject: `Good News! You're in: ${eventDetails.title}`,
+            text: `Hi ${nextInLine.volunteer.name},\n\nA spot opened up for "${eventDetails.title}" and you have been automatically registered!\n\nDate: ${new Date(eventDetails.date).toLocaleDateString()}\nLocation: ${eventDetails.location}\n\nSee you there!`
+          };
+          sendEmail(emailOptions); 
+        } catch (emailError) {
+          console.error('Promotion email failed to send:', emailError);
+        }
       }
     }
     // --- AUTO-PROMOTION LOGIC END ---
@@ -234,7 +252,7 @@ const deleteEvent = async (req, res) => {
     const event = await Event.findById(req.params.id);
 
     if (event) {
-      // Bonus: Also delete all registrations for this event
+      // Also delete all registrations for this event to verify clean state
       await Registration.deleteMany({ event: req.params.id });
       // Now delete the event itself
       await Event.findByIdAndDelete(req.params.id);
@@ -254,13 +272,12 @@ const deleteEvent = async (req, res) => {
 const getVolunteersForEvent = async (req, res) => {
   try {
     const registrations = await Registration.find({ event: req.params.id })
-                                            .populate('volunteer', 'name email skills'); // <-- 'populate' gets the user details
+                                            .populate('volunteer', 'name email skills'); 
 
     if (!registrations || registrations.length === 0) {
-      return res.status(404).json({ message: 'No registrations found for this event' });
+      return res.json([]); 
     }
     
-    // Extract just the volunteer details for a cleaner response
     const volunteers = registrations.map(reg => reg.volunteer);
     res.json(volunteers);
 
@@ -269,6 +286,31 @@ const getVolunteersForEvent = async (req, res) => {
   }
 };
 
+// @desc    Get list of event IDs the current user is registered for
+// @route   GET /api/events/my-registrations
+// @access  Private
+const getMyRegistrations = async (req, res) => {
+  try {
+    // Find all registrations for this user
+    const registrations = await Registration.find({ volunteer: req.user._id }).select('event');
+    
+    // Return just the array of Event IDs
+    const eventIds = registrations.map(reg => reg.event);
+    res.json(eventIds);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+const getMyWaitlist = async (req, res) => {
+  try {
+    const waitlist = await Waitlist.find({ volunteer: req.user._id }).select('event');
+    const eventIds = waitlist.map(w => w.event);
+    res.json(eventIds);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
 
 module.exports = {
   createEvent,
@@ -279,4 +321,7 @@ module.exports = {
   updateEvent, 
   deleteEvent, 
   getVolunteersForEvent,
+  getMyRegistrations, // Exported new function
+  getMyWaitlist,
 };
+

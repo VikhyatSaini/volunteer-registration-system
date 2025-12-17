@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const bcrypt = require('bcryptjs');
+const crypto = require('crypto'); // Built-in Node.js module (Moved to top for cleaner scope)
 
 const userSchema = new mongoose.Schema(
   {
@@ -28,7 +29,8 @@ const userSchema = new mongoose.Schema(
     },
     profilePicture: {
       type: String,
-      default: 'https://via.placeholder.com/150.png?text=User', // Default avatar
+      // --- UPDATED DEFAULT IMAGE ---
+      default: 'https://encrypted-tbn0.gstatic.com/images?q=tbn:ANd9GcS5TPu3HoTZkTyxzVY6h3fuKo-nPU85G5u4Vw&s', 
     },
     availability: {
       type: [String], // An array of strings, e.g., ["Monday AM", "Wednesday PM"]
@@ -65,9 +67,8 @@ userSchema.methods.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
+// --- Password Reset Token Generator ---
 userSchema.methods.createPasswordResetToken = function () {
-  const crypto = require('crypto'); // Built-in Node.js module
-
   // 1. Generate the token
   const resetToken = crypto.randomBytes(32).toString('hex');
 
@@ -86,3 +87,6 @@ userSchema.methods.createPasswordResetToken = function () {
 
 const User = mongoose.model('User', userSchema);
 module.exports = User;
+
+
+

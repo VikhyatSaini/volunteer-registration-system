@@ -9,26 +9,46 @@ const {
   updateEvent, 
   deleteEvent, 
   getVolunteersForEvent,
+  getMyRegistrations,
+  getMyWaitlist, // <--- Added this import
 } = require('../controllers/event.controller');
 const { submitHours } = require('../controllers/hourlog.controller');
 const { protect } = require('../middleware/auth.middleware');
 const { isAdmin } = require('../middleware/admin.middleware');
 const upload = require('../config/cloudinary');
 const { joinWaitlist } = require('../controllers/waitlist.controller');
-// --- Public Routes ---
-router.get('/', getAllEvents); // GET /api/events
-router.get('/:id', getEventById); // GET /api/events/123
 
-// --- Private Routes (Protected) ---
-// We'll let any logged-in user create an event for now
-// In Phase 3, we'll add 'admin' middleware here
-router.post('/', protect, isAdmin, upload.single('image'), createEvent); // POST /api/events
+// --- 1. Specific/Static Routes FIRST ---
+
+// Public: Get all events
+router.get('/', getAllEvents); 
+
+// Private: Get logged-in user's registrations 
+// (MUST be before /:id to avoid conflict)
+router.get('/my-registrations', protect, getMyRegistrations);
+router.get('/my-waitlist', protect, getMyWaitlist); // <--- ADD THIS NEW ROUTE
+
+// --- 2. Dynamic /:id Routes SECOND ---
+
+// Public: Get single event by ID
+router.get('/:id', getEventById); 
+
+
+// --- 3. Protected / Admin Routes ---
+
+// Create Event (Admin Only)
+router.post('/', protect, isAdmin, upload.single('image'), createEvent);
+
+// Update/Delete Event (Admin Only)
 router.put('/:id', protect, isAdmin, updateEvent);
 router.delete('/:id', protect, isAdmin, deleteEvent); 
+
+// Get Volunteers for Event (Admin Only)
 router.get('/:id/volunteers', protect, isAdmin, getVolunteersForEvent);
 
-router.post('/:id/register', protect, registerForEvent); // POST /api/events/123/register
-router.delete('/:id/unregister', protect, unregisterForEvent); // DELETE /api/events/123/unregister
+// Volunteer Actions
+router.post('/:id/register', protect, registerForEvent); 
+router.delete('/:id/unregister', protect, unregisterForEvent); 
 router.post('/:id/waitlist', protect, joinWaitlist); 
 router.post('/:id/loghours', protect, submitHours);
 
