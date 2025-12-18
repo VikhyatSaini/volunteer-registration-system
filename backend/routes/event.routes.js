@@ -11,6 +11,7 @@ const {
   getVolunteersForEvent,
   getMyRegistrations,
   getMyWaitlist, // <--- Added this import
+  leaveWaitlist, // <--- Added this import
 } = require('../controllers/event.controller');
 const { submitHours } = require('../controllers/hourlog.controller');
 const { protect } = require('../middleware/auth.middleware');
@@ -50,6 +51,7 @@ router.get('/:id/volunteers', protect, isAdmin, getVolunteersForEvent);
 router.post('/:id/register', protect, registerForEvent); 
 router.delete('/:id/unregister', protect, unregisterForEvent); 
 router.post('/:id/waitlist', protect, joinWaitlist); 
+router.delete('/:id/waitlist', protect, leaveWaitlist); // <--- ADD THIS ROUTE
 router.post('/:id/loghours', protect, submitHours);
 
 module.exports = router;

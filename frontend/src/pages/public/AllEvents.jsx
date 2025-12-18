@@ -28,7 +28,8 @@ const AllEvents = () => {
   const { data: events, isLoading, isError } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
-      const response = await api.get('/events');
+      // Fetch 1000 events to ensure we have the full list for client-side filtering
+      const response = await api.get('/events?limit=1000');
       return response.data;
     },
   });
@@ -48,14 +49,15 @@ const AllEvents = () => {
     enabled: !!user, 
   });
 
-  // 3. Fetch My Waitlist (New)
+  // 3. Fetch My Waitlist
   const { data: waitlistedEventIds } = useQuery({
     queryKey: ['my-waitlist'],
     queryFn: async () => {
       if (!user) return [];
       try {
         const response = await api.get('/events/my-waitlist');
-        return response.data; 
+        // FIX: Map the full event objects back to just IDs for this check
+        return response.data.map(event => event._id); 
       } catch (error) {
         return [];
       }
@@ -95,7 +97,7 @@ const AllEvents = () => {
     }
   });
 
-  // 6. Waitlist Mutation (New)
+  // 6. Waitlist Mutation
   const waitlistMutation = useMutation({
     mutationFn: async (eventId) => {
       return await api.post(`/events/${eventId}/waitlist`);
@@ -133,16 +135,26 @@ const AllEvents = () => {
     waitlistMutation.mutate(eventId);
   };
 
+  // Reset page when searching
   useEffect(() => {
     setCurrentPage(1);
   }, [searchTerm]);
 
-  const filteredEvents = events?.filter(event => 
-    event.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    (event.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()))
-  ) || [];
+  // --- UPDATED FILTERING LOGIC ---
+  const filteredEvents = events?.filter(event => {
+    // 1. Search Filter
+    const matchesSearch = 
+      event.title?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
+      (event.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
 
+    // 2. Date Filter: Only show events that are in the future
+    const isUpcoming = new Date(event.date) > new Date();
+
+    return matchesSearch && isUpcoming;
+  }) || [];
+
+  // Client-side Pagination Logic
   const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
   const startIndex = (currentPage - 1) * ITEMS_PER_PAGE;
   const currentEvents = filteredEvents.slice(startIndex, startIndex + ITEMS_PER_PAGE);
@@ -327,8 +339,8 @@ const AllEvents = () => {
         </div>
       ) : (
         <div className="text-center py-20 bg-slate-900/50 rounded-xl border border-dashed border-slate-800">
-          <h3 className="text-lg font-medium text-white">No events found</h3>
-          <p className="text-slate-500 text-sm mt-1">Try adjusting your search terms.</p>
+          <h3 className="text-lg font-medium text-white">No upcoming events found</h3>
+          <p className="text-slate-500 text-sm mt-1">Check back later for new opportunities.</p>
         </div>
       )}
 

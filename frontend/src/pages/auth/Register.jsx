@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
-import { User, Mail, Lock, Loader2, Sparkles } from 'lucide-react';
+import { User, Mail, Lock, Loader2, Sparkles, Eye, EyeOff } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -11,6 +11,7 @@ const Register = () => {
   const { register: registerUser } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm();
 
   const onSubmit = async (data) => {
@@ -21,39 +22,10 @@ const Register = () => {
   };
 
   return (
-    <div className="w-full h-[650px] bg-slate-900/70 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-800 overflow-hidden flex flex-col lg:flex-row">
+    // Fixed height (600px) must match Login page exactly
+    <div className="w-full h-[600px] bg-slate-900/70 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-800 overflow-hidden flex flex-col lg:flex-row">
       
-      {/* Left Side */}
-      <div className="hidden lg:flex w-1/2 relative flex-col justify-between p-12 overflow-hidden bg-slate-900/40">
-        <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-blue-500/10 to-transparent"></div>
-        <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-30"></div>
-        
-        <div className="relative z-10">
-          <h3 className="text-2xl font-bold text-white tracking-wide flex items-center gap-3">
-            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-900/20">
-              <Sparkles className="text-white h-5 w-5" />
-            </div>
-            RallyPoint
-          </h3>
-        </div>
-
-        <div className="relative z-10 space-y-6">
-          <h1 className="text-4xl font-bold text-white leading-tight drop-shadow-md">
-            Be the <br />
-            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Change Maker</span>
-          </h1>
-          <p className="text-slate-300 text-lg max-w-sm leading-relaxed drop-shadow-sm">
-            Your journey starts here. Create an account to track your hours, join exclusive events, and build your volunteer portfolio.
-          </p>
-        </div>
-
-        <div className="relative z-10 pt-6 border-t border-slate-800/50 flex gap-8">
-          <div><p className="text-2xl font-bold text-white">10k+</p><p className="text-xs text-slate-400 uppercase tracking-wider">Volunteers</p></div>
-          <div><p className="text-2xl font-bold text-white">500+</p><p className="text-xs text-slate-400 uppercase tracking-wider">Events</p></div>
-        </div>
-      </div>
-
-      {/* Right Side - Form */}
+      {/* LEFT SIDE: Form (Swapped - This was on Right in Login) */}
       <div className="w-full lg:w-1/2 p-8 lg:p-12 flex flex-col justify-center bg-slate-950/60">
         <div className="max-w-md w-full mx-auto space-y-6">
           <div className="text-center lg:text-left">
@@ -84,7 +56,20 @@ const Register = () => {
               <Label htmlFor="password" className="text-slate-300">Password</Label>
               <div className="relative group">
                 <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-500 group-focus-within:text-blue-400 transition-colors" />
-                <Input id="password" type="password" placeholder="••••••••" className="pl-10 focus:border-blue-500/50" {...register("password", { required: "Password is required" })} />
+                <Input 
+                  id="password" 
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="••••••••" 
+                  className="pl-10 pr-10 focus:border-blue-500/50" 
+                  {...register("password", { required: "Password is required" })} 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 transition-colors focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
               {errors.password && <span className="text-xs text-red-400">{errors.password.message}</span>}
             </div>
@@ -94,7 +79,6 @@ const Register = () => {
             </Button>
           </form>
 
-          {/* Navigation to Login - This triggers the flip back */}
           <div className="text-center text-sm text-slate-400 mt-4">
             Already have an account?{" "}
             <Link to="/login" className="text-blue-400 hover:text-blue-300 font-semibold transition-colors inline-flex items-center group">
@@ -103,12 +87,42 @@ const Register = () => {
           </div>
         </div>
       </div>
+
+      {/* RIGHT SIDE: Visuals (Swapped - This was on Left in Login) */}
+      <div className="hidden lg:flex w-1/2 relative flex-col justify-between p-12 overflow-hidden bg-slate-900/40">
+        <div className="absolute top-0 right-0 w-full h-full bg-gradient-to-bl from-blue-500/10 to-transparent"></div>
+        <div className="absolute -top-24 -right-24 w-64 h-64 bg-indigo-600 rounded-full blur-[100px] opacity-30"></div>
+        
+        <div className="relative z-10">
+          <h3 className="text-2xl font-bold text-white tracking-wide flex items-center gap-3">
+            <div className="w-10 h-10 rounded-lg bg-gradient-to-br from-blue-500 to-indigo-600 flex items-center justify-center shadow-lg shadow-blue-900/20">
+              <Sparkles className="text-white h-5 w-5" />
+            </div>
+            RallyPoint
+          </h3>
+        </div>
+
+        <div className="relative z-10 space-y-6">
+          <h1 className="text-4xl font-bold text-white leading-tight drop-shadow-md">
+            Be the <br />
+            <span className="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-indigo-400">Change Maker</span>
+          </h1>
+          <p className="text-slate-300 text-lg max-w-sm leading-relaxed drop-shadow-sm">
+            Your journey starts here. Create an account to track your hours, join exclusive events, and build your volunteer portfolio.
+          </p>
+        </div>
+
+        <div className="relative z-10 pt-6 border-t border-slate-800/50 flex gap-8">
+          <div><p className="text-2xl font-bold text-white">10k+</p><p className="text-xs text-slate-400 uppercase tracking-wider">Volunteers</p></div>
+          <div><p className="text-2xl font-bold text-white">500+</p><p className="text-xs text-slate-400 uppercase tracking-wider">Events</p></div>
+        </div>
+      </div>
+
     </div>
   );
 };
 
 export default Register;
-
 
 
 

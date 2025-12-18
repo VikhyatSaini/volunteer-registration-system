@@ -302,11 +302,46 @@ const getMyRegistrations = async (req, res) => {
   }
 };
 
+// --- UPDATE THIS FUNCTION ---
+// @desc    Get list of events user is waitlisted for (Full Details)
+// @route   GET /api/events/my-waitlist
+// @access  Private
 const getMyWaitlist = async (req, res) => {
   try {
-    const waitlist = await Waitlist.find({ volunteer: req.user._id }).select('event');
-    const eventIds = waitlist.map(w => w.event);
-    res.json(eventIds);
+    // 1. Find waitlist entries
+    const waitlistItems = await Waitlist.find({ volunteer: req.user._id });
+    
+    // 2. Extract Event IDs
+    const eventIds = waitlistItems.map(w => w.event);
+
+    // 3. Fetch full event details (sorted by date)
+    const events = await Event.find({ _id: { $in: eventIds } }).sort({ date: 1 });
+    
+    res.json(events);
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// --- ADD THIS NEW FUNCTION ---
+// @desc    Leave the waitlist for an event
+// @route   DELETE /api/events/:id/waitlist
+// @access  Private
+const leaveWaitlist = async (req, res) => {
+  const eventId = req.params.id;
+  const volunteerId = req.user._id;
+
+  try {
+    const deleted = await Waitlist.findOneAndDelete({
+      event: eventId,
+      volunteer: volunteerId
+    });
+
+    if (deleted) {
+      res.json({ message: 'Removed from waitlist' });
+    } else {
+      res.status(404).json({ message: 'Waitlist entry not found' });
+    }
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
@@ -322,6 +357,7 @@ module.exports = {
   deleteEvent, 
   getVolunteersForEvent,
   getMyRegistrations, // Exported new function
-  getMyWaitlist,
+  getMyWaitlist, // Updated
+  leaveWaitlist, // Added
 };
 

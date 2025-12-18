@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, useNavigate } from 'react-router-dom';
-import { Mail, Lock, Loader2, HeartHandshake } from 'lucide-react';
+import { Mail, Lock, Loader2, HeartHandshake, Eye, EyeOff } from 'lucide-react';
 import useAuth from '../../hooks/useAuth';
 import { Button } from '../../components/ui/button';
 import { Input } from '../../components/ui/input';
@@ -11,6 +11,7 @@ const Login = () => {
   const { login } = useAuth();
   const navigate = useNavigate();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const { register, handleSubmit, formState: { errors } } = useForm();
 
   const onSubmit = async (data) => {
@@ -21,9 +22,10 @@ const Login = () => {
   };
 
   return (
+    // Fixed height (600px) is mandatory for the flip to look like one object
     <div className="w-full h-[600px] bg-slate-900/70 backdrop-blur-xl rounded-2xl shadow-2xl border border-slate-800 overflow-hidden flex flex-col lg:flex-row">
       
-      {/* Left Side */}
+      {/* LEFT SIDE: Visuals */}
       <div className="hidden lg:flex w-1/2 relative flex-col justify-between p-12 overflow-hidden bg-slate-900/40">
         <div className="absolute top-0 left-0 w-full h-full bg-gradient-to-br from-emerald-500/10 to-transparent"></div>
         <div className="absolute -bottom-24 -left-24 w-64 h-64 bg-emerald-600 rounded-full blur-[100px] opacity-20"></div>
@@ -54,7 +56,7 @@ const Login = () => {
         </div>
       </div>
 
-      {/* Right Side - Form */}
+      {/* RIGHT SIDE: Form */}
       <div className="w-full lg:w-1/2 p-8 lg:p-16 flex flex-col justify-center bg-slate-950/60">
         <div className="max-w-md w-full mx-auto space-y-8">
           <div className="text-center lg:text-left">
@@ -79,7 +81,20 @@ const Login = () => {
               </div>
               <div className="relative group">
                 <Lock className="absolute left-3 top-2.5 h-4 w-4 text-slate-500 group-focus-within:text-emerald-400 transition-colors" />
-                <Input id="password" type="password" placeholder="••••••••" className="pl-10" {...register("password", { required: "Password is required" })} />
+                <Input 
+                  id="password" 
+                  type={showPassword ? "text" : "password"} 
+                  placeholder="••••••••" 
+                  className="pl-10 pr-10" 
+                  {...register("password", { required: "Password is required" })} 
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute right-3 top-2.5 text-slate-500 hover:text-slate-300 transition-colors focus:outline-none"
+                >
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                </button>
               </div>
               {errors.password && <span className="text-xs text-red-400">{errors.password.message}</span>}
             </div>
@@ -89,7 +104,6 @@ const Login = () => {
             </Button>
           </form>
 
-          {/* Navigation to Register - This triggers the flip */}
           <div className="text-center text-sm text-slate-400 mt-6">
             New here?{" "}
             <Link to="/register" className="text-emerald-400 hover:text-emerald-300 font-semibold transition-colors inline-flex items-center group">
@@ -103,7 +117,6 @@ const Login = () => {
 };
 
 export default Login;
-
 
 
 

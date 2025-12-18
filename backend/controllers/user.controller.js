@@ -120,9 +120,19 @@ const updateUserProfile = async (req, res) => {
           : req.body.availability.split(',').map(s => s.trim()).filter(Boolean);
       }
 
-      // Optional: Password update logic
-      if (req.body.password) {
-        user.password = req.body.password;
+      // --- SECURE PASSWORD UPDATE LOGIC ---
+      // If user wants to change password, they must provide the new one AND current one
+      if (req.body.newPassword) {
+         if (!req.body.currentPassword) {
+             return res.status(400).json({ message: 'Please provide your current password to make changes.' });
+         }
+         
+         // Verify current password
+         if (await user.matchPassword(req.body.currentPassword)) {
+             user.password = req.body.newPassword;
+         } else {
+             return res.status(401).json({ message: 'Incorrect current password.' });
+         }
       }
 
       const updatedUser = await user.save();
@@ -205,7 +215,7 @@ const updateUserStatus = async (req, res) => {
 
 module.exports = { 
   registerUser,
-  loginUser, // <--- EXPORTED LOGIN
+  loginUser,
   getUserProfile,
   updateUserProfile,
   getMyRegisteredEvents,
