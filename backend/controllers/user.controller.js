@@ -106,8 +106,6 @@ const updateUserProfile = async (req, res) => {
       }
 
       // --- FIX: Handle Arrays (Skills/Availability) ---
-      // Frontend FormData sends these as strings (e.g. "Coding, Driving")
-      // We must split them back into arrays for the Database
       if (req.body.skills) {
         user.skills = Array.isArray(req.body.skills) 
           ? req.body.skills 
@@ -121,7 +119,6 @@ const updateUserProfile = async (req, res) => {
       }
 
       // --- SECURE PASSWORD UPDATE LOGIC ---
-      // If user wants to change password, they must provide the new one AND current one
       if (req.body.newPassword) {
          if (!req.body.currentPassword) {
              return res.status(400).json({ message: 'Please provide your current password to make changes.' });
@@ -176,23 +173,24 @@ const getMyRegisteredEvents = async (req, res) => {
   }
 };
 
-// @desc    Get all users (Volunteers)
+// @desc    Get all users (Volunteers & Admins)
 // @route   GET /api/users
 // @access  Private/Admin
 const getAllUsers = async (req, res) => {
   try {
-    const users = await User.find({ role: 'volunteer' }).select('-password');
+    // Return all users so Admin can manage everyone
+    const users = await User.find({}).select('-password');
     res.json(users);
   } catch (error) {
     res.status(500).json({ message: error.message });
   }
 };
 
-// @desc    Update a user's status (approve/reject)
+// @desc    Update a user's status (Specific for Approval Workflow)
 // @route   PUT /api/users/:id/status
 // @access  Private/Admin
 const updateUserStatus = async (req, res) => {
-  const { status } = req.body; // status should be 'approved' or 'rejected'
+  const { status } = req.body; // 'approved' or 'rejected'
 
   if (!['approved', 'rejected'].includes(status)) {
     return res.status(400).json({ message: 'Invalid status' });
@@ -213,6 +211,60 @@ const updateUserStatus = async (req, res) => {
   }
 };
 
+// --- NEW FUNCTIONS FOR ADMIN MANAGEMENT ---
+
+// @desc    Admin updates any user (Role, Status, Info)
+// @route   PUT /api/users/:id
+// @access  Private/Admin
+const updateUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (user) {
+      user.name = req.body.name || user.name;
+      user.email = req.body.email || user.email;
+      user.role = req.body.role || user.role;
+      // Handle status updates (active/banned)
+      if (req.body.status) {
+        user.status = req.body.status;
+      }
+
+      const updatedUser = await user.save();
+
+      res.json({
+        _id: updatedUser._id,
+        name: updatedUser.name,
+        email: updatedUser.email,
+        role: updatedUser.role,
+        status: updatedUser.status,
+      });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
+// @desc    Delete user
+// @route   DELETE /api/users/:id
+// @access  Private/Admin
+const deleteUser = async (req, res) => {
+  try {
+    const user = await User.findById(req.params.id);
+
+    if (user) {
+      // Optional: Delete associated data (registrations, logs) if needed
+      await User.deleteOne({ _id: user._id });
+      res.json({ message: 'User removed' });
+    } else {
+      res.status(404).json({ message: 'User not found' });
+    }
+  } catch (error) {
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = { 
   registerUser,
   loginUser,
@@ -221,4 +273,6 @@ module.exports = {
   getMyRegisteredEvents,
   getAllUsers,
   updateUserStatus,
+  updateUser, // 👈 Exported
+  deleteUser, // 👈 Exported
 };

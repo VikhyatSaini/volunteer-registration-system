@@ -3,9 +3,9 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useNavigate } from 'react-router-dom';
 import { 
   MapPin, Search, Loader2, ArrowRight, CheckCircle2, 
-  ChevronLeft, ChevronRight, Eye, XCircle, ClipboardList
+  ChevronLeft, ChevronRight, Eye, XCircle, ClipboardList, Calendar
 } from 'lucide-react';
-import { format } from 'date-fns';
+import { format, startOfDay } from 'date-fns'; // Import startOfDay
 import toast from 'react-hot-toast';
 
 import api from '../../lib/axios';
@@ -28,10 +28,13 @@ const AllEvents = () => {
   const { data: events, isLoading, isError } = useQuery({
     queryKey: ['events'],
     queryFn: async () => {
-      // Fetch 1000 events to ensure we have the full list for client-side filtering
+      // Ensure we get FRESH data
       const response = await api.get('/events?limit=1000');
+      console.log("DEBUG: All Events fetched:", response.data); // Check console to see if new event is here
       return response.data;
     },
+    staleTime: 0, // Always consider data stale to force refresh on mount
+    refetchOnWindowFocus: true, 
   });
 
   // 2. Fetch My Registrations
@@ -56,7 +59,6 @@ const AllEvents = () => {
       if (!user) return [];
       try {
         const response = await api.get('/events/my-waitlist');
-        // FIX: Map the full event objects back to just IDs for this check
         return response.data.map(event => event._id); 
       } catch (error) {
         return [];
@@ -148,11 +150,15 @@ const AllEvents = () => {
       event.location?.toLowerCase().includes(searchTerm.toLowerCase()) ||
       (event.tags || []).some(tag => tag.toLowerCase().includes(searchTerm.toLowerCase()));
 
-    // 2. Date Filter: Only show events that are in the future
-    const isUpcoming = new Date(event.date) > new Date();
+    // 2. Date Filter (Relaxed)
+    // Show events that are today or in the future
+    // We use startOfDay to compare just dates, ignoring time
+    const eventDate = new Date(event.date);
+    const today = startOfDay(new Date());
+    const isUpcoming = eventDate >= today; 
 
     return matchesSearch && isUpcoming;
-  }) || [];
+  }).sort((a, b) => new Date(a.date) - new Date(b.date)) || []; // Sort nearest first
 
   // Client-side Pagination Logic
   const totalPages = Math.ceil(filteredEvents.length / ITEMS_PER_PAGE);
@@ -166,24 +172,24 @@ const AllEvents = () => {
     }
   };
 
-  if (isLoading) return <div className="flex h-96 items-center justify-center"><Loader2 className="h-10 w-10 animate-spin text-emerald-500" /></div>;
-  if (isError) return <div className="text-center mt-20 text-red-400">Failed to load events.</div>;
+  if (isLoading) return <div className="flex items-center justify-center h-96"><Loader2 className="w-10 h-10 animate-spin text-emerald-500" /></div>;
+  if (isError) return <div className="mt-20 text-center text-red-400">Failed to load events.</div>;
 
   return (
-    <div className="space-y-6 pb-10">
+    <div className="pb-10 space-y-6">
       
       {/* Header & Search */}
-      <div className="flex flex-col md:flex-row justify-between items-end gap-6">
+      <div className="flex flex-col items-end justify-between gap-6 md:flex-row">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight">Explore Opportunities</h1>
-          <p className="text-slate-400 mt-1 text-base">Find your next mission and make an impact.</p>
+          <h1 className="text-3xl font-bold tracking-tight text-white">Explore Opportunities</h1>
+          <p className="mt-1 text-base text-slate-400">Find your next mission and make an impact.</p>
         </div>
         
         <div className="relative w-full md:w-80">
           <Search className="absolute left-3 top-2.5 h-4 w-4 text-slate-500" />
           <Input 
             placeholder="Search events..." 
-            className="pl-9 h-10 bg-slate-900/50 border-slate-700 focus:border-emerald-500 text-sm"
+            className="h-10 text-sm text-white pl-9 bg-slate-900/50 border-slate-700 focus:border-emerald-500"
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
           />
@@ -205,17 +211,17 @@ const AllEvents = () => {
             const isOnWaitlist = waitlistedEventIds?.includes(event._id);
 
             return (
-              <Card key={event._id} className="group flex flex-col overflow-hidden border-slate-800 bg-slate-900/60 backdrop-blur-sm hover:border-emerald-500/50 transition-all duration-300">
+              <Card key={event._id} className="flex flex-col overflow-hidden transition-all duration-300 group border-slate-800 bg-slate-900/60 backdrop-blur-sm hover:border-emerald-500/50">
                 
                 {/* Image Section */}
-                <div className="relative h-36 overflow-hidden">
-                  <div className="absolute inset-0 bg-gradient-to-t from-slate-900/90 via-transparent to-transparent z-10" />
+                <div className="relative overflow-hidden h-36">
+                  <div className="absolute inset-0 z-10 bg-gradient-to-t from-slate-900/90 via-transparent to-transparent" />
                   <img 
                     src={event.bannerImage || "https://images.unsplash.com/photo-1559027615-cd4628902d4a?auto=format&fit=crop&q=80"} 
                     alt={event.title} 
-                    className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                    className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105"
                   />
-                  <div className="absolute top-3 left-3 z-20">
+                  <div className="absolute z-20 top-3 left-3">
                     <Badge className="bg-slate-950/80 backdrop-blur-md text-white border-slate-700 text-[10px] px-2 py-0.5">
                       {tags[0] || "General"}
                     </Badge>
@@ -224,21 +230,21 @@ const AllEvents = () => {
 
                 {/* Content */}
                 <CardHeader className="p-4 pb-2">
-                  <div className="flex justify-between items-start mb-1">
-                    <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider">
-                      {dateStr}
+                  <div className="flex items-start justify-between mb-1">
+                    <div className="text-[10px] font-bold text-emerald-400 uppercase tracking-wider flex items-center gap-1">
+                      <Calendar className="w-3 h-3" /> {dateStr}
                     </div>
                   </div>
-                  <CardTitle className="text-base font-bold text-white line-clamp-1 leading-tight">
+                  <CardTitle className="text-base font-bold leading-tight text-white line-clamp-1">
                     {event.title}
                   </CardTitle>
-                  <div className="flex items-center text-slate-400 text-xs mt-1">
-                    <MapPin className="h-3 w-3 mr-1" /> {event.location}
+                  <div className="flex items-center mt-1 text-xs text-slate-400">
+                    <MapPin className="w-3 h-3 mr-1" /> {event.location}
                   </div>
                 </CardHeader>
                 
-                <CardContent className="p-4 pt-0 flex-1">
-                  <p className="text-slate-400 text-xs line-clamp-2 leading-relaxed mb-3">
+                <CardContent className="flex-1 p-4 pt-0">
+                  <p className="mb-3 text-xs leading-relaxed text-slate-400 line-clamp-2">
                     {event.description}
                   </p>
                   
@@ -252,7 +258,7 @@ const AllEvents = () => {
                         {registeredCount} / {event.slotsAvailable} Filled
                       </span>
                     </div>
-                    <div className="h-1 w-full bg-slate-800 rounded-full overflow-hidden">
+                    <div className="w-full h-1 overflow-hidden rounded-full bg-slate-800">
                       <div 
                         className={`h-full rounded-full transition-all duration-500 ${isFull ? 'bg-red-500' : 'bg-emerald-500'}`} 
                         style={{ width: `${Math.min((registeredCount / event.slotsAvailable) * 100, 100)}%` }}
@@ -262,29 +268,28 @@ const AllEvents = () => {
                 </CardContent>
 
                 {/* Footer Buttons */}
-                <CardFooter className="p-3 pt-0 grid grid-cols-2 gap-2 border-t border-slate-800/50 mt-auto">
+                <CardFooter className="grid grid-cols-2 gap-2 p-3 pt-0 mt-auto border-t border-slate-800/50">
                   
                   <Button 
                     variant="outline" 
                     size="sm"
-                    className="h-9 border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-800 hover:text-white text-xs"
+                    className="text-xs h-9 border-slate-700 bg-slate-800/50 text-slate-300 hover:bg-slate-800 hover:text-white"
                     onClick={() => navigate(`/events/${event._id}`)}
                   >
-                    <Eye className="mr-2 h-3 w-3" /> Details
+                    <Eye className="w-3 h-3 mr-2" /> Details
                   </Button>
 
                   {/* Dynamic Button Logic */}
                   {isJoined ? (
-                    // State: Already Registered
                     <Button 
                       size="sm"
                       variant="destructive"
-                      className="h-9 bg-red-500/10 text-red-500 hover:bg-red-500/20 border border-red-500/20 text-xs"
+                      className="text-xs text-red-500 border h-9 bg-red-500/10 hover:bg-red-500/20 border-red-500/20"
                       onClick={(e) => handleLeave(e, event._id)}
                       disabled={leaveMutation.isPending}
                     >
                       {leaveMutation.isPending ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <Loader2 className="w-3 h-3 animate-spin" />
                       ) : (
                         <>
                           Unregister <XCircle className="ml-1.5 h-3 w-3" />
@@ -293,20 +298,19 @@ const AllEvents = () => {
                     </Button>
 
                   ) : isFull ? (
-                    // State: Event Full (Check Waitlist)
                     isOnWaitlist ? (
-                      <Button size="sm" variant="secondary" disabled className="h-9 bg-amber-500/10 text-amber-500 border border-amber-500/20 text-xs">
+                      <Button size="sm" variant="secondary" disabled className="text-xs border h-9 bg-amber-500/10 text-amber-500 border-amber-500/20">
                          <ClipboardList className="mr-1.5 h-3 w-3" /> On Waitlist
                       </Button>
                     ) : (
                       <Button 
                         size="sm"
-                        className="h-9 bg-amber-600 hover:bg-amber-700 text-white text-xs"
+                        className="text-xs text-white h-9 bg-amber-600 hover:bg-amber-700"
                         onClick={(e) => handleWaitlist(e, event._id)}
                         disabled={waitlistMutation.isPending}
                       >
                         {waitlistMutation.isPending ? (
-                           <Loader2 className="h-3 w-3 animate-spin" />
+                           <Loader2 className="w-3 h-3 animate-spin" />
                         ) : (
                            <>
                              Join Waitlist <ClipboardList className="ml-1.5 h-3 w-3" />
@@ -316,15 +320,14 @@ const AllEvents = () => {
                     )
 
                   ) : (
-                    // State: Available to Register
                     <Button 
                       size="sm"
-                      className="h-9 bg-emerald-600 hover:bg-emerald-700 text-white text-xs"
+                      className="text-xs text-white h-9 bg-emerald-600 hover:bg-emerald-700"
                       onClick={(e) => handleJoin(e, event._id)}
                       disabled={joinMutation.isPending}
                     >
                       {joinMutation.isPending ? (
-                        <Loader2 className="h-3 w-3 animate-spin" />
+                        <Loader2 className="w-3 h-3 animate-spin" />
                       ) : (
                         <>
                           Register <ArrowRight className="ml-1.5 h-3 w-3" />
@@ -338,9 +341,9 @@ const AllEvents = () => {
           })}
         </div>
       ) : (
-        <div className="text-center py-20 bg-slate-900/50 rounded-xl border border-dashed border-slate-800">
+        <div className="py-20 text-center border border-dashed bg-slate-900/50 rounded-xl border-slate-800">
           <h3 className="text-lg font-medium text-white">No upcoming events found</h3>
-          <p className="text-slate-500 text-sm mt-1">Check back later for new opportunities.</p>
+          <p className="mt-1 text-sm text-slate-500">Check back later for new opportunities.</p>
         </div>
       )}
 
@@ -356,9 +359,9 @@ const AllEvents = () => {
               size="sm"
               onClick={() => handlePageChange(currentPage - 1)}
               disabled={currentPage === 1}
-              className="h-8 w-8 p-0 border-slate-700"
+              className="w-8 h-8 p-0 border-slate-700"
             >
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="w-4 h-4" />
             </Button>
             <div className="flex items-center px-2 text-sm text-slate-300">
               Page {currentPage} of {totalPages}
@@ -368,9 +371,9 @@ const AllEvents = () => {
               size="sm"
               onClick={() => handlePageChange(currentPage + 1)}
               disabled={currentPage === totalPages}
-              className="h-8 w-8 p-0 border-slate-700"
+              className="w-8 h-8 p-0 border-slate-700"
             >
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="w-4 h-4" />
             </Button>
           </div>
         </div>

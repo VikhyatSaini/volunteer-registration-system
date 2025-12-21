@@ -30,6 +30,7 @@ const CreateEvent = () => {
   });
 
   // Watch fields for AI generation context
+  // [0]=title, [1]=location, [2]=date, [3]=description
   const watchedFields = watch(['title', 'location', 'date', 'description']);
 
   // --- MUTATION ---
@@ -75,38 +76,83 @@ const CreateEvent = () => {
     }
   };
 
-  // --- MOCK AI HANDLERS (Connect to real endpoints if available) ---
+  // --- REAL AI HANDLERS ---
+
+  // 1. Generate Description using Gemini
   const handleGenerateDescription = async () => {
-    if (!watchedFields[0]) return toast.error('Please enter a Title first.');
+    const title = watchedFields[0];
+    const location = watchedFields[1];
+    const date = watchedFields[2];
+
+    if (!title || !location) {
+      return toast.error('Please enter a Title and Location first for better results.');
+    }
+
     setIsGeneratingDesc(true);
     
-    // Simulate API call
-    setTimeout(() => {
-      setValue('description', `Join us for ${watchedFields[0]}! This is a fantastic opportunity to make a difference at ${watchedFields[1] || 'our location'}. We need volunteers to help with logistics, coordination, and community engagement. No prior experience required—just bring your passion!`);
+    try {
+      // Call the backend endpoint
+      const response = await api.post('/ai/generate', {
+        title,
+        location,
+        date
+      });
+
+      // Update the form with the real AI text
+      setValue('description', response.data.generatedDescription);
+      toast.success('AI Description generated! ✨');
+    } catch (error) {
+      console.error("AI Error:", error);
+      toast.error('Failed to generate description. Please try again.');
+    } finally {
       setIsGeneratingDesc(false);
-      toast.success('Description generated!');
-    }, 1500);
+    }
   };
 
+  // 2. Auto Classify Tags using Gemini
   const handleAutoTag = async () => {
+    const title = watchedFields[0];
+    const location = watchedFields[1];
+    const description = watchedFields[3];
+
+    if (!title) {
+      return toast.error('Please enter a Title first.');
+    }
+
     setIsGeneratingTags(true);
-    setTimeout(() => {
-      setValue('tags', 'Community, Volunteer, Social Impact, Weekend');
+
+    try {
+      // Call the backend endpoint
+      const response = await api.post('/ai/classify', {
+        title,
+        location,
+        description
+      });
+
+      // Backend returns array: { tags: ["Tag1", "Tag2"] }
+      // Convert to comma-separated string for the input field
+      const tagsString = response.data.tags.join(', ');
+      
+      setValue('tags', tagsString);
+      toast.success('AI Tags generated! 🏷️');
+    } catch (error) {
+      console.error("AI Tag Error:", error);
+      toast.error('Failed to generate tags.');
+    } finally {
       setIsGeneratingTags(false);
-      toast.success('Tags generated!');
-    }, 1000);
+    }
   };
 
   return (
-    <div className="min-h-screen relative w-full pb-20 overflow-hidden">
+    <div className="relative w-full min-h-screen pb-20 overflow-hidden">
       
       {/* --- BACKGROUND AMBIENCE --- */}
-      <div className="fixed inset-0 pointer-events-none z-0">
+      <div className="fixed inset-0 z-0 pointer-events-none">
          <div className="absolute top-[-10%] right-[-5%] w-[600px] h-[600px] bg-purple-600/10 rounded-full blur-[120px]"></div>
          <div className="absolute bottom-[-10%] left-[-10%] w-[500px] h-[500px] bg-indigo-600/10 rounded-full blur-[100px]"></div>
       </div>
 
-      <div className="relative z-10 max-w-6xl mx-auto pt-6 px-6">
+      <div className="relative z-10 max-w-6xl px-6 pt-6 mx-auto">
         
         {/* --- HEADER --- */}
         <motion.div 
@@ -118,12 +164,12 @@ const CreateEvent = () => {
               variant="ghost" 
               size="icon" 
               onClick={() => navigate('/admin')}
-              className="text-slate-400 hover:text-white hover:bg-slate-800/50 rounded-full border border-transparent hover:border-slate-700"
+              className="border border-transparent rounded-full text-slate-400 hover:text-white hover:bg-slate-800/50 hover:border-slate-700"
             >
               <ArrowLeft size={24} />
             </Button>
             <div>
-              <h1 className="text-3xl font-bold text-white tracking-tight flex items-center gap-2">
+              <h1 className="flex items-center gap-2 text-3xl font-bold tracking-tight text-white">
                  Create Event <Sparkles className="text-pink-500 animate-pulse" size={24} />
               </h1>
               <p className="text-slate-400">Design a new initiative for your volunteers.</p>
@@ -132,35 +178,35 @@ const CreateEvent = () => {
         </motion.div>
 
         {/* --- MAIN FORM GRID --- */}
-        <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 lg:grid-cols-12 gap-8">
+        <form onSubmit={handleSubmit(onSubmit)} className="grid grid-cols-1 gap-8 lg:grid-cols-12">
           
           {/* LEFT COLUMN: Media & Basic Info (4 Cols) */}
-          <div className="lg:col-span-4 space-y-6">
+          <div className="space-y-6 lg:col-span-4">
              
              {/* 1. Image Upload Card */}
              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.1 }}>
-               <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-xl shadow-xl overflow-hidden">
+               <Card className="overflow-hidden shadow-xl bg-slate-900/60 border-slate-800 backdrop-blur-xl">
                   <CardHeader className="pb-4">
-                     <CardTitle className="text-white text-base font-semibold flex items-center gap-2">
+                     <CardTitle className="flex items-center gap-2 text-base font-semibold text-white">
                         <ImageIcon size={18} className="text-indigo-400" /> Event Banner
                      </CardTitle>
                   </CardHeader>
                   <CardContent>
                      <div className="flex items-center justify-center w-full">
-                        <label htmlFor="dropzone-file" className="relative flex flex-col items-center justify-center w-full aspect-square border-2 border-slate-700 border-dashed rounded-2xl cursor-pointer bg-slate-950/30 hover:bg-slate-900/50 hover:border-indigo-500/50 transition-all overflow-hidden group">
+                        <label htmlFor="dropzone-file" className="relative flex flex-col items-center justify-center w-full overflow-hidden transition-all border-2 border-dashed cursor-pointer aspect-square border-slate-700 rounded-2xl bg-slate-950/30 hover:bg-slate-900/50 hover:border-indigo-500/50 group">
                           {imagePreview ? (
                             <>
-                              <img src={imagePreview} alt="Preview" className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105" />
-                              <div className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex flex-col items-center justify-center text-white text-sm font-medium backdrop-blur-sm">
+                              <img src={imagePreview} alt="Preview" className="object-cover w-full h-full transition-transform duration-500 group-hover:scale-105" />
+                              <div className="absolute inset-0 flex flex-col items-center justify-center text-sm font-medium text-white transition-opacity opacity-0 bg-black/50 group-hover:opacity-100 backdrop-blur-sm">
                                  <Upload size={24} className="mb-2" /> Change Image
                               </div>
                             </>
                           ) : (
-                            <div className="flex flex-col items-center justify-center pt-5 pb-6 text-center p-4">
-                              <div className="p-4 rounded-full bg-slate-900 border border-slate-800 mb-4 group-hover:scale-110 group-hover:border-indigo-500/50 transition-transform shadow-lg group-hover:shadow-indigo-500/20">
-                                <Upload className="w-8 h-8 text-slate-400 group-hover:text-indigo-400 transition-colors" />
+                            <div className="flex flex-col items-center justify-center p-4 pt-5 pb-6 text-center">
+                              <div className="p-4 mb-4 transition-transform border rounded-full shadow-lg bg-slate-900 border-slate-800 group-hover:scale-110 group-hover:border-indigo-500/50 group-hover:shadow-indigo-500/20">
+                                <Upload className="w-8 h-8 transition-colors text-slate-400 group-hover:text-indigo-400" />
                               </div>
-                              <p className="mb-2 text-sm text-slate-300 font-medium">Click to upload banner</p>
+                              <p className="mb-2 text-sm font-medium text-slate-300">Click to upload banner</p>
                               <p className="text-xs text-slate-500">SVG, PNG, JPG (Max 800x800px)</p>
                             </div>
                           )}
@@ -179,11 +225,11 @@ const CreateEvent = () => {
 
              {/* 2. Key Details Card */}
              <motion.div initial={{ opacity: 0, x: -20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.2 }}>
-                <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-xl shadow-xl">
+                <Card className="shadow-xl bg-slate-900/60 border-slate-800 backdrop-blur-xl">
                    <CardContent className="pt-6 space-y-5">
                       {/* Date */}
                       <div className="space-y-2">
-                        <Label className="text-slate-300 flex items-center gap-2"><Calendar size={14} className="text-purple-400" /> Date & Time</Label>
+                        <Label className="flex items-center gap-2 text-slate-300"><Calendar size={14} className="text-purple-400" /> Date & Time</Label>
                         <Input 
                           type="datetime-local"
                           className="bg-slate-950/50 border-slate-700 focus:border-purple-500 h-11 text-white [color-scheme:dark]"
@@ -194,10 +240,10 @@ const CreateEvent = () => {
 
                       {/* Capacity */}
                       <div className="space-y-2">
-                        <Label className="text-slate-300 flex items-center gap-2"><Users size={14} className="text-cyan-400" /> Total Capacity</Label>
+                        <Label className="flex items-center gap-2 text-slate-300"><Users size={14} className="text-cyan-400" /> Total Capacity</Label>
                         <Input 
                           type="number" min="1"
-                          className="bg-slate-950/50 border-slate-700 focus:border-cyan-500 h-11 text-white"
+                          className="text-white bg-slate-950/50 border-slate-700 focus:border-cyan-500 h-11"
                           {...register("slotsAvailable", { required: "Required" })} 
                         />
                       </div>
@@ -209,15 +255,15 @@ const CreateEvent = () => {
           {/* RIGHT COLUMN: Details Form (8 Cols) */}
           <div className="lg:col-span-8">
             <motion.div initial={{ opacity: 0, x: 20 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: 0.15 }} className="h-full">
-              <Card className="bg-slate-900/60 border-slate-800 backdrop-blur-xl shadow-xl h-full flex flex-col">
-                <CardHeader className="border-b border-slate-800/50 pb-6">
-                  <CardTitle className="text-white flex items-center gap-2 text-xl">
-                    <Layers className="h-5 w-5 text-indigo-400" />
+              <Card className="flex flex-col h-full shadow-xl bg-slate-900/60 border-slate-800 backdrop-blur-xl">
+                <CardHeader className="pb-6 border-b border-slate-800/50">
+                  <CardTitle className="flex items-center gap-2 text-xl text-white">
+                    <Layers className="w-5 h-5 text-indigo-400" />
                     Event Information
                   </CardTitle>
                 </CardHeader>
                 
-                <CardContent className="pt-8 space-y-8 flex-1">
+                <CardContent className="flex-1 pt-8 space-y-8">
                   
                   {/* Title */}
                   <div className="space-y-2">
@@ -227,7 +273,7 @@ const CreateEvent = () => {
                       <Input 
                         id="title" 
                         placeholder="e.g. Annual Beach Cleanup Initiative" 
-                        className="pl-10 bg-slate-950/50 border-slate-700 focus:border-indigo-500 h-12 text-white text-lg placeholder:text-slate-600"
+                        className="h-12 pl-10 text-lg text-white bg-slate-950/50 border-slate-700 focus:border-indigo-500 placeholder:text-slate-600"
                         {...register("title", { required: "Title is required" })} 
                       />
                     </div>
@@ -242,7 +288,7 @@ const CreateEvent = () => {
                       <Input 
                         id="location" 
                         placeholder="e.g. Central Park, NY (or Remote)" 
-                        className="pl-10 bg-slate-950/50 border-slate-700 focus:border-indigo-500 h-12 text-white"
+                        className="h-12 pl-10 text-white bg-slate-950/50 border-slate-700 focus:border-indigo-500"
                         {...register("location", { required: "Location is required" })} 
                       />
                     </div>
@@ -259,7 +305,7 @@ const CreateEvent = () => {
                         disabled={isGeneratingDesc}
                         className="text-[10px] uppercase font-bold tracking-wider flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-pink-500/10 to-purple-500/10 text-pink-400 border border-pink-500/20 hover:border-pink-500/50 hover:bg-pink-500/20 transition-all disabled:opacity-50"
                       >
-                        {isGeneratingDesc ? <Loader2 className="h-3 w-3 animate-spin" /> : <Sparkles className="h-3 w-3" />}
+                        {isGeneratingDesc ? <Loader2 className="w-3 h-3 animate-spin" /> : <Sparkles className="w-3 h-3" />}
                         AI Write
                       </button>
                     </div>
@@ -282,7 +328,7 @@ const CreateEvent = () => {
                         disabled={isGeneratingTags}
                         className="text-[10px] uppercase font-bold tracking-wider flex items-center gap-1.5 px-3 py-1.5 rounded-full bg-gradient-to-r from-cyan-500/10 to-blue-500/10 text-cyan-400 border border-cyan-500/20 hover:border-cyan-500/50 hover:bg-cyan-500/20 transition-all disabled:opacity-50"
                       >
-                        {isGeneratingTags ? <Loader2 className="h-3 w-3 animate-spin" /> : <Tags className="h-3 w-3" />}
+                        {isGeneratingTags ? <Loader2 className="w-3 h-3 animate-spin" /> : <Tags className="w-3 h-3" />}
                         Auto Classify
                       </button>
                     </div>
@@ -290,7 +336,7 @@ const CreateEvent = () => {
                       <Input 
                         id="tags" 
                         placeholder="Environment, Outdoor, Teamwork..." 
-                        className="bg-slate-950/50 border-slate-700 focus:border-cyan-500 h-11 text-white"
+                        className="text-white bg-slate-950/50 border-slate-700 focus:border-cyan-500 h-11"
                         {...register("tags")} 
                       />
                     </div>
@@ -298,12 +344,12 @@ const CreateEvent = () => {
                   </div>
 
                   {/* Action Bar */}
-                  <div className="pt-8 mt-auto flex justify-end gap-4 border-t border-slate-800/50">
+                  <div className="flex justify-end gap-4 pt-8 mt-auto border-t border-slate-800/50">
                     <Button 
                       type="button" 
                       variant="ghost" 
                       onClick={() => navigate('/admin')}
-                      className="text-slate-400 hover:text-white hover:bg-slate-800 h-12 px-6"
+                      className="h-12 px-6 text-slate-400 hover:text-white hover:bg-slate-800"
                     >
                       Cancel
                     </Button>
@@ -314,11 +360,11 @@ const CreateEvent = () => {
                     >
                       {createEventMutation.isPending ? (
                         <>
-                          <Loader2 className="mr-2 h-5 w-5 animate-spin" /> Publishing...
+                          <Loader2 className="w-5 h-5 mr-2 animate-spin" /> Publishing...
                         </>
                       ) : (
                         <>
-                          <Save className="mr-2 h-5 w-5" /> Publish Event
+                          <Save className="w-5 h-5 mr-2" /> Publish Event
                         </>
                       )}
                     </Button>

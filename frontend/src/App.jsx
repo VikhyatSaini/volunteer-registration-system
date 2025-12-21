@@ -2,7 +2,7 @@ import { Routes, Route } from 'react-router-dom';
 import { AnimatePresence } from 'framer-motion';
 
 // --- 1. Public Pages ---
-import Home from './pages/public/Home'; // The new Landing Page
+import Home from './pages/public/Home'; 
 import AllEvents from './pages/public/AllEvents';
 import EventDetails from './pages/public/EventDetails';
 
@@ -15,6 +15,9 @@ import AdminDashboard from './pages/admin/AdminDashboard';
 import CreateEvent from './pages/admin/CreateEvent';
 import ManageVolunteers from './pages/admin/ManageVolunteers';
 import ApproveHours from './pages/admin/ApproveHours';
+import ManageEvents from './pages/admin/ManageEvents';
+import EventDetailsAdmin from './pages/admin/EventDetailsAdmin';
+import AdminMessages from './pages/admin/AdminMessages';
 
 // --- 4. Volunteer Pages ---
 import VolunteerDashboard from './pages/volunteer/VolunteerDashboard';
@@ -44,6 +47,10 @@ function App() {
           {/* Landing Page */}
           <Route path="/" element={<Home />} />
           
+          {/* Public Event Browsing */}
+          <Route path="/events" element={<AllEvents />} />
+          <Route path="/events/:id" element={<EventDetails />} />
+          
           
           {/* =========================================
               AUTH ROUTES (Login / Register)
@@ -61,23 +68,32 @@ function App() {
           ========================================== */}
           <Route element={<DashboardLayout />}>
             
-            {/* --- Admin Only Routes --- */}
+            {/* ---------------------------
+                A. ADMIN ONLY ROUTES 
+            ---------------------------- */}
             <Route path="/admin" element={<AdminDashboard />} />
+            
+            {/* Event Management */}
+            <Route path="/admin/events/manage" element={<ManageEvents />} />       {/* Table View */}
+            <Route path="/admin/events/:id/manage" element={<EventDetailsAdmin />} /> {/* Detail/Edit View */}
             <Route path="/admin/events/create" element={<CreateEvent />} />
+            
+            {/* User & Request Management */}
             <Route path="/admin/volunteers" element={<ManageVolunteers />} />
             <Route path="/admin/approvals" element={<ApproveHours />} />
+            <Route path="/admin/messages" element={<AdminMessages />} />           {/* Support Inbox */}
 
-            {/* --- Volunteer Only Routes --- */}
+            {/* ---------------------------
+                B. VOLUNTEER ONLY ROUTES 
+            ---------------------------- */}
             <Route path="/dashboard" element={<VolunteerDashboard />} />
             <Route path="/my-hours" element={<MyHistory />} />
             <Route path="/my-registrations" element={<MyRegistrations />} />
 
-            {/* --- Public/Shared within Dashboard --- */}
-            {/* Volunteers browse events here while logged in */}
-            <Route path="/events" element={<AllEvents />} />
-            <Route path="/events/:id" element={<EventDetails />} />
-            
-            {/* --- Common Routes (Accessible by both) --- */}
+            {/* ---------------------------
+                C. SHARED / PUBLIC DASHBOARD ROUTES
+            ---------------------------- */}
+            {/* Common Pages (Profile, Support) */}
             <Route path="/profile" element={<Profile />} />
             <Route path="/support" element={<Support />} />
 
@@ -90,7 +106,7 @@ function App() {
           <Route path="*" element={
             <div className="flex h-screen items-center justify-center bg-[#0f172a] text-center">
               <div>
-                <h1 className="text-4xl font-bold text-white mb-2">404</h1>
+                <h1 className="mb-2 text-4xl font-bold text-white">404</h1>
                 <p className="text-slate-400">Page not found</p>
               </div>
             </div>

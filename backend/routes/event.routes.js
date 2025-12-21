@@ -10,8 +10,9 @@ const {
   deleteEvent, 
   getVolunteersForEvent,
   getMyRegistrations,
-  getMyWaitlist, // <--- Added this import
-  leaveWaitlist, // <--- Added this import
+  getMyWaitlist, 
+  leaveWaitlist, 
+  removeVolunteer, // 👈 1. IMPORT THIS NEW FUNCTION
 } = require('../controllers/event.controller');
 const { submitHours } = require('../controllers/hourlog.controller');
 const { protect } = require('../middleware/auth.middleware');
@@ -27,7 +28,7 @@ router.get('/', getAllEvents);
 // Private: Get logged-in user's registrations 
 // (MUST be before /:id to avoid conflict)
 router.get('/my-registrations', protect, getMyRegistrations);
-router.get('/my-waitlist', protect, getMyWaitlist); // <--- ADD THIS NEW ROUTE
+router.get('/my-waitlist', protect, getMyWaitlist);
 
 // --- 2. Dynamic /:id Routes SECOND ---
 
@@ -47,11 +48,14 @@ router.delete('/:id', protect, isAdmin, deleteEvent);
 // Get Volunteers for Event (Admin Only)
 router.get('/:id/volunteers', protect, isAdmin, getVolunteersForEvent);
 
+// Remove specific volunteer from event (Admin Only)
+router.delete('/:id/volunteers/:volunteerId', protect, isAdmin, removeVolunteer); // 👈 2. ADD THIS ROUTE
+
 // Volunteer Actions
 router.post('/:id/register', protect, registerForEvent); 
 router.delete('/:id/unregister', protect, unregisterForEvent); 
 router.post('/:id/waitlist', protect, joinWaitlist); 
-router.delete('/:id/waitlist', protect, leaveWaitlist); // <--- ADD THIS ROUTE
+router.delete('/:id/waitlist', protect, leaveWaitlist);
 router.post('/:id/loghours', protect, submitHours);
 
 module.exports = router;

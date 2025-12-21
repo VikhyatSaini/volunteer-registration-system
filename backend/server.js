@@ -37,6 +37,7 @@ app.use('/api/events', eventRoutes);
 app.use('/api/admin', adminRoutes);
 
 app.use('/api/ai', aiRoutes);
+app.use('/api/messages', require('./routes/message.routes'));
 
 // (We will add error middleware here later for a cleaner setup)
 
