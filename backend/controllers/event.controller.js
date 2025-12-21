@@ -302,7 +302,6 @@ const getMyRegistrations = async (req, res) => {
   }
 };
 
-// --- UPDATE THIS FUNCTION ---
 // @desc    Get list of events user is waitlisted for (Full Details)
 // @route   GET /api/events/my-waitlist
 // @access  Private
@@ -323,7 +322,6 @@ const getMyWaitlist = async (req, res) => {
   }
 };
 
-// --- ADD THIS NEW FUNCTION ---
 // @desc    Leave the waitlist for an event
 // @route   DELETE /api/events/:id/waitlist
 // @access  Private
@@ -347,6 +345,62 @@ const leaveWaitlist = async (req, res) => {
   }
 };
 
+// @desc    Admin removes a specific volunteer from an event (Auto-promotes waitlist)
+// @route   DELETE /api/events/:id/volunteers/:volunteerId
+// @access  Private (Admin)
+const removeVolunteer = async (req, res) => {
+  const { id: eventId, volunteerId } = req.params;
+
+  try {
+    // 1. Remove the Registration
+    const registration = await Registration.findOneAndDelete({
+      event: eventId,
+      volunteer: volunteerId,
+    });
+
+    if (!registration) {
+      return res.status(404).json({ message: 'Registration not found' });
+    }
+
+    // 2. Logic: Auto-Promote from Waitlist (Reusing unregister logic)
+    const nextInLine = await Waitlist.findOne({ event: eventId })
+                                     .sort({ createdAt: 1 })
+                                     .populate('volunteer');
+
+    if (nextInLine) {
+      // Create new registration for next in line
+      await Registration.create({
+        event: eventId,
+        volunteer: nextInLine.volunteer._id,
+      });
+
+      // Remove from waitlist
+      await Waitlist.findByIdAndDelete(nextInLine._id);
+
+      // Send Email Notification
+      const eventDetails = await Event.findById(eventId);
+      if (eventDetails && nextInLine.volunteer && nextInLine.volunteer.email) {
+        try {
+          const emailOptions = {
+            to: nextInLine.volunteer.email,
+            subject: `Good News! You're in: ${eventDetails.title}`,
+            text: `Hi ${nextInLine.volunteer.name},\n\nA spot opened up for "${eventDetails.title}" and you have been automatically registered!\n\nDate: ${new Date(eventDetails.date).toLocaleDateString()}\nLocation: ${eventDetails.location}\n\nSee you there!`
+          };
+          sendEmail(emailOptions); 
+        } catch (emailError) {
+          console.error('Promotion email failed to send:', emailError);
+        }
+      }
+    }
+
+    res.json({ message: 'Volunteer removed successfully' });
+
+  } catch (error) {
+    console.error(error);
+    res.status(500).json({ message: error.message });
+  }
+};
+
 module.exports = {
   createEvent,
   getAllEvents,
@@ -356,8 +410,8 @@ module.exports = {
   updateEvent, 
   deleteEvent, 
   getVolunteersForEvent,
-  getMyRegistrations, // Exported new function
-  getMyWaitlist, // Updated
-  leaveWaitlist, // Added
+  getMyRegistrations,
+  getMyWaitlist,
+  leaveWaitlist,
+  removeVolunteer // Exported new function
 };
-
